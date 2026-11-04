@@ -7,12 +7,26 @@ require_once __DIR__ . '/config/database.php';
 $error = '';
 $success = '';
 
+$classrooms = $pdo->query("
+    SELECT c.id, c.classroom_name, g.grade_name, ay.year_name,
+           c.grade_level_id, c.academic_year_id
+    FROM classrooms c
+    INNER JOIN grade_levels g ON g.id = c.grade_level_id
+    INNER JOIN academic_years ay ON ay.id = c.academic_year_id
+    WHERE c.is_active = 1
+      AND g.is_active = 1
+      AND ay.is_current = 1
+      AND ay.status = 'active'
+    ORDER BY g.grade_number, c.classroom_name
+")->fetchAll();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fullName = trim($_POST['full_name'] ?? '');
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $studentNumber = trim($_POST['student_number'] ?? '');
+    $classroomId = filter_input(INPUT_POST, 'classroom_id', FILTER_VALIDATE_INT);
     $gender = $_POST['gender'] ?? '';
     $dateOfBirth = $_POST['date_of_birth'] ?? '';
     $phone = trim($_POST['phone'] ?? '');
@@ -22,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (
         $fullName === '' || $username === '' ||
         $password === '' || $studentNumber === '' ||
+        !$classroomId ||
         !in_array($gender, ['male', 'female'], true)
     ) {
         $error = 'يرجى ملء الحقول المطلوبة بصورة صحيحة.';
@@ -32,6 +47,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $pdo->beginTransaction();
+
+            $classroomStmt = $pdo->prepare("
+                SELECT c.grade_level_id, c.academic_year_id
+                FROM classrooms c
+                INNER JOIN grade_levels g ON g.id = c.grade_level_id
+                INNER JOIN academic_years ay ON ay.id = c.academic_year_id
+                WHERE c.id = :classroom_id
+                  AND c.is_active = 1
+                  AND g.is_active = 1
+                  AND ay.is_current = 1
+                  AND ay.status = 'active'
+                LIMIT 1
+            ");
+            $classroomStmt->execute(['classroom_id' => $classroomId]);
+            $classroom = $classroomStmt->fetch();
+
+            if (!$classroom) {
+                throw new RuntimeException(
+                    'الفصل المحدد غير متاح في السنة الدراسية الحالية.'
+                );
+            }
 
             $roleStmt = $pdo->prepare(
                 "SELECT id FROM roles WHERE role_name = 'student' LIMIT 1"
@@ -76,8 +112,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $address !== '' ? $address : null
             ]);
 
+            $studentId = (int) $pdo->lastInsertId();
+
+            $enrollmentStmt = $pdo->prepare("
+                INSERT INTO student_enrollments (
+                    student_id,
+                    academic_year_id,
+                    grade_level_id,
+                    classroom_id,
+                    enrollment_date,
+                    status
+                ) VALUES (?, ?, ?, ?, ?, 'enrolled')
+            ");
+            $enrollmentStmt->execute([
+                $studentId,
+                (int) $classroom['academic_year_id'],
+                (int) $classroom['grade_level_id'],
+                (int) $classroomId,
+                $admissionDate
+            ]);
+
             $pdo->commit();
             $success = 'تمت إضافة الطالب بنجاح.';
+        } catch (RuntimeException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            $error = $e->getMessage();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -95,7 +157,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $students = $pdo->query(
     "SELECT s.id, s.student_number, s.gender, s.admission_date,
-            u.full_name, u.username, u.phone
+            u.full_name, u.username, u.phone,
+            (
+                SELECT c.classroom_name
+                FROM student_enrollments se
+                INNER JOIN academic_years ay
+                    ON ay.id = se.academic_year_id
+                INNER JOIN classrooms c
+                    ON c.id = se.classroom_id
+                WHERE se.student_id = s.id
+                  AND se.status = 'enrolled'
+                  AND ay.is_current = 1
+                  AND ay.status = 'active'
+                ORDER BY se.id DESC
+                LIMIT 1
+            ) AS classroom_name
      FROM students s
      INNER JOIN users u ON u.id = s.user_id
      ORDER BY s.id DESC"
@@ -125,6 +201,11 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <div class="card-body">
+        <?php if (!$classrooms): ?>
+            <div class="alert alert-warning">
+                لا توجد فصول نشطة للسنة الدراسية الحالية. أضف فصلاً وفعّل السنة الدراسية الحالية أولاً.
+            </div>
+        <?php endif; ?>
         <form method="POST" action="students.php">
             <div class="row g-3">
 
@@ -164,6 +245,26 @@ require_once __DIR__ . '/includes/header.php';
                            maxlength="30">
                 </div>
 
+                <div class="col-md-6">
+                    <label class="form-label">الفصل الدراسي *</label>
+                    <select name="classroom_id" class="form-select" required
+                            <?= !$classrooms ? 'disabled' : '' ?>>
+                        <option value="">اختر الفصل</option>
+                        <?php foreach ($classrooms as $classroom): ?>
+                            <option value="<?= (int) $classroom['id'] ?>"
+                                <?= (int) ($_POST['classroom_id'] ?? 0) === (int) $classroom['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars(
+                                    $classroom['grade_name'] . ' - ' .
+                                    $classroom['classroom_name'] . ' - ' .
+                                    $classroom['year_name'],
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <div class="col-md-4">
                     <label class="form-label">الجنس *</label>
                     <select name="gender" class="form-select" required>
@@ -192,7 +293,8 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
 
                 <div class="col-12">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary"
+                            <?= !$classrooms ? 'disabled' : '' ?>>
                         حفظ الطالب
                     </button>
                 </div>
@@ -216,13 +318,14 @@ require_once __DIR__ . '/includes/header.php';
                     <th>اسم المستخدم</th>
                     <th>الجنس</th>
                     <th>الهاتف</th>
+                    <th>الفصل</th>
                     <th>تاريخ القبول</th>
                 </tr>
             </thead>
             <tbody>
             <?php if (!$students): ?>
                 <tr>
-                    <td colspan="6" class="text-center py-4 text-secondary">
+                    <td colspan="7" class="text-center py-4 text-secondary">
                         لا يوجد طلاب مسجلون حتى الآن.
                     </td>
                 </tr>
@@ -234,6 +337,7 @@ require_once __DIR__ . '/includes/header.php';
                         <td><?= htmlspecialchars($student['username'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= $student['gender'] === 'male' ? 'ذكر' : 'أنثى' ?></td>
                         <td><?= htmlspecialchars($student['phone'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= htmlspecialchars($student['classroom_name'] ?? 'غير مسجل', ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($student['admission_date'], ENT_QUOTES, 'UTF-8') ?></td>
                     </tr>
                 <?php endforeach; ?>

@@ -214,7 +214,9 @@ if ($canManageTimetable && $editId > 0) {
 }
 
 // جلب التكليفات مع أسماء المعلمين والمواد والفصول والسنة
-$stmt = $pdo->query("
+$assignments = [];
+if ($canManageTimetable) {
+    $stmt = $pdo->query("
     SELECT
         ta.id,
         u.full_name AS teacher_name,
@@ -228,11 +230,32 @@ $stmt = $pdo->query("
     INNER JOIN classrooms c ON c.id = ta.classroom_id
     INNER JOIN academic_years ay ON ay.id = ta.academic_year_id
     ORDER BY ay.id DESC, c.classroom_name, s.subject_name
-");
-$assignments = $stmt->fetchAll();
+    ");
+    $assignments = $stmt->fetchAll();
+}
+
+$studentEnrollment = null;
+if ($roleName === 'student') {
+    $stmt = $pdo->prepare("
+        SELECT e.classroom_id, e.academic_year_id, c.classroom_name
+        FROM students s
+        INNER JOIN student_enrollments e ON e.student_id = s.id
+        INNER JOIN academic_years ay ON ay.id = e.academic_year_id
+        INNER JOIN classrooms c ON c.id = e.classroom_id
+        WHERE s.user_id = :user_id
+          AND e.status = 'enrolled'
+          AND ay.is_current = 1
+          AND ay.status = 'active'
+          AND c.is_active = 1
+        ORDER BY e.id DESC
+        LIMIT 1
+    ");
+    $stmt->execute(['user_id' => (int) $_SESSION['user_id']]);
+    $studentEnrollment = $stmt->fetch() ?: null;
+}
 
 // جلب جدول الحصص
-$stmt = $pdo->query("
+$timetableSql = "
     SELECT
         t.*,
         u.full_name AS teacher_name,
@@ -247,13 +270,36 @@ $stmt = $pdo->query("
     INNER JOIN subjects s ON s.id = ta.subject_id
     INNER JOIN classrooms c ON c.id = ta.classroom_id
     INNER JOIN academic_years ay ON ay.id = ta.academic_year_id
+";
+
+if ($studentEnrollment) {
+    $timetableSql .= "
+    WHERE ta.classroom_id = :classroom_id
+      AND ta.academic_year_id = :academic_year_id
+    ";
+}
+
+$timetableSql .= "
     ORDER BY FIELD(
         t.day_of_week,
         'sunday', 'monday', 'tuesday', 'wednesday',
         'thursday', 'friday', 'saturday'
     ), t.start_time
-");
-$lessons = $stmt->fetchAll();
+";
+
+$lessons = [];
+if ($roleName !== 'student' || $studentEnrollment) {
+    $stmt = $pdo->prepare($timetableSql);
+    if ($studentEnrollment) {
+        $stmt->execute([
+            'classroom_id' => (int) $studentEnrollment['classroom_id'],
+            'academic_year_id' => (int) $studentEnrollment['academic_year_id']
+        ]);
+    } else {
+        $stmt->execute();
+    }
+    $lessons = $stmt->fetchAll();
+}
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -264,7 +310,13 @@ require_once __DIR__ . '/includes/header.php';
         <div>
             <h2>جدول الحصص الدراسية</h2>
             <p class="text-muted mb-0">
-                تنظيم مواعيد المعلمين والمواد والفصول
+                <?php if ($roleName === 'student' && $studentEnrollment): ?>
+                    جدول فصل <?= htmlspecialchars($studentEnrollment['classroom_name'], ENT_QUOTES, 'UTF-8') ?>
+                <?php elseif ($roleName === 'student'): ?>
+                    جدول الفصل الدراسي الحالي
+                <?php else: ?>
+                    تنظيم مواعيد المعلمين والمواد والفصول
+                <?php endif; ?>
             </p>
         </div>
         <span class="badge bg-primary fs-6">
@@ -390,6 +442,11 @@ require_once __DIR__ . '/includes/header.php';
     <div class="card shadow-sm">
         <div class="card-header">الحصص المسجلة</div>
         <div class="card-body">
+            <?php if ($roleName === 'student' && !$studentEnrollment): ?>
+                <div class="alert alert-warning">
+                    لم يتم تسجيلك في فصل للسنة الدراسية الحالية. يُرجى التواصل مع إدارة المدرسة.
+                </div>
+            <?php endif; ?>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle">
                     <thead class="table-light">
@@ -410,7 +467,9 @@ require_once __DIR__ . '/includes/header.php';
                         <?php if (!$lessons): ?>
                             <tr>
                                 <td colspan="10" class="text-center text-muted">
-                                    لا توجد حصص مسجلة حتى الآن.
+                                    <?= $roleName === 'student' && $studentEnrollment
+                                        ? 'لا توجد حصص مسجلة لفصلك حتى الآن.'
+                                        : 'لا توجد حصص مسجلة حتى الآن.' ?>
                                 </td>
                             </tr>
                         <?php else: ?>
