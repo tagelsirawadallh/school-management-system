@@ -141,17 +141,26 @@ require_once __DIR__ . '/includes/header.php';
     border-radius: 10px;
 }
 @media print {
-    .no-print, .sidebar, footer {
+    .no-print {
         display: none !important;
     }
-    .content {
+    body * {
+        visibility: hidden !important;
+    }
+    .results-print-area,
+    .results-print-area * {
+        visibility: visible !important;
+    }
+    .results-print-area {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
-    }
-    body {
-        background: #fff !important;
-    }
-    .report-card {
+        margin: 0 !important;
         box-shadow: none !important;
+    }
+    .results-print-area .table-responsive {
+        overflow: visible !important;
     }
 }
 </style>
@@ -163,10 +172,6 @@ require_once __DIR__ . '/includes/header.php';
             <h2 class="fw-bold mb-1">التقارير والنتائج</h2>
             <p class="text-secondary mb-0">متابعة أداء الطلاب ونتائج الاختبارات</p>
         </div>
-        <button type="button" class="btn btn-outline-primary no-print"
-                onclick="window.print()">
-            طباعة التقرير
-        </button>
     </div>
 
     <?php foreach ($errors as $error): ?>
@@ -267,13 +272,19 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <div class="card report-card">
+    <div class="card report-card results-print-area">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold mb-0">تفاصيل درجات الطلاب</h5>
-                <span class="badge bg-secondary">
-                    <?= number_format(count($results)) ?> نتيجة
-                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary">
+                        <?= number_format(count($results)) ?> نتيجة
+                    </span>
+                    <button type="button" class="btn btn-outline-primary btn-sm no-print"
+                            onclick="window.print()">
+                        🖨️ طباعة النتائج
+                    </button>
+                </div>
             </div>
 
             <div class="table-responsive">

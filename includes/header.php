@@ -1,9 +1,51 @@
 
 <?php
 $pageTitle = $pageTitle ?? 'نظام إدارة المدرسة';
+$hideSidebar = basename($_SERVER['SCRIPT_NAME'] ?? '') === 'index.php';
 
 $schoolName = 'مدرسة الملاذ';
 $schoolLogo = '';
+$themeColors = [
+    'primary' => '#155e6b',
+    'accent' => '#c49a5a',
+    'background' => '#f3f6f8'
+];
+
+$isThemeColor = static function ($color): bool {
+    return is_string($color) && preg_match('/^#[0-9a-fA-F]{6}$/', $color) === 1;
+};
+
+$mixThemeColor = static function (string $color, int $amount): string {
+    $hex = ltrim($color, '#');
+    $channels = [
+        hexdec(substr($hex, 0, 2)),
+        hexdec(substr($hex, 2, 2)),
+        hexdec(substr($hex, 4, 2))
+    ];
+    $channels = array_map(
+        static fn (int $channel): int => (int) round(
+            $channel + ((255 - $channel) * $amount / 100)
+        ),
+        $channels
+    );
+
+    return sprintf('#%02x%02x%02x', $channels[0], $channels[1], $channels[2]);
+};
+
+$darkenThemeColor = static function (string $color, int $amount): string {
+    $hex = ltrim($color, '#');
+    $channels = [
+        hexdec(substr($hex, 0, 2)),
+        hexdec(substr($hex, 2, 2)),
+        hexdec(substr($hex, 4, 2))
+    ];
+    $channels = array_map(
+        static fn (int $channel): int => (int) round($channel * (100 - $amount) / 100),
+        $channels
+    );
+
+    return sprintf('#%02x%02x%02x', $channels[0], $channels[1], $channels[2]);
+};
 
 /*
  * قراءة دور المستخدم الحالي.
@@ -119,6 +161,32 @@ function showMenuLink(string $page): bool
  */
 try {
     if (isset($pdo)) {
+        $tableCheck = $pdo->query("SHOW TABLES LIKE 'app_theme_settings'");
+        if ($tableCheck->fetchColumn()) {
+            $themeStmt = $pdo->query("
+                SELECT color_primary, color_accent, color_background
+                FROM app_theme_settings
+                WHERE id = 1
+                LIMIT 1
+            ");
+            $savedTheme = $themeStmt->fetch();
+
+            if ($savedTheme) {
+                foreach ($themeColors as $key => $default) {
+                    $savedColor = $savedTheme['color_' . $key] ?? null;
+                    if ($isThemeColor($savedColor)) {
+                        $themeColors[$key] = strtolower($savedColor);
+                    }
+                }
+            }
+        }
+    }
+} catch (PDOException $e) {
+    error_log('Theme colors could not be loaded: ' . $e->getMessage());
+}
+
+try {
+    if (isset($pdo)) {
         $stmt = $pdo->query(
             "SELECT school_name, logo_path
              FROM school_settings
@@ -143,7 +211,7 @@ try {
         }
     }
 } catch (PDOException $e) {
-    error_log($e->getMessage());
+    error_log('School branding could not be loaded: ' . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -161,18 +229,29 @@ try {
 
     <style>
         :root {
-            --primary: #0d5c8c;
-            --primary-dark: #0a4a74;
-            --primary-soft: #eaf4fb;
-            --accent: #f59e0b;
-            --bg: #eef4f8;
+            --primary: <?= htmlspecialchars($themeColors['primary'], ENT_QUOTES, 'UTF-8') ?>;
+            --primary-dark: <?= htmlspecialchars($darkenThemeColor($themeColors['primary'], 20), ENT_QUOTES, 'UTF-8') ?>;
+            --primary-soft: <?= htmlspecialchars($mixThemeColor($themeColors['primary'], 90), ENT_QUOTES, 'UTF-8') ?>;
+            --primary-rgb: <?= hexdec(substr($themeColors['primary'], 1, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 3, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 5, 2)) ?>;
+            --primary-dark-rgb: <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 1, 2)) ?>, <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 3, 2)) ?>, <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 5, 2)) ?>;
+            --accent: <?= htmlspecialchars($themeColors['accent'], ENT_QUOTES, 'UTF-8') ?>;
+            --bg: <?= htmlspecialchars($themeColors['background'], ENT_QUOTES, 'UTF-8') ?>;
             --panel: #ffffff;
-            --panel-2: #f8fbff;
-            --muted: #64748b;
-            --text: #1f2937;
-            --border: #dfeaf3;
-            --success: #16a34a;
-            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            --panel-2: #f8fafb;
+            --muted: #647681;
+            --text: #24343b;
+            --border: #dce5e8;
+            --success: #198754;
+            --shadow: 0 10px 28px rgba(25, 50, 60, 0.07);
+            --bs-primary: var(--primary);
+            --bs-primary-rgb: <?= hexdec(substr($themeColors['primary'], 1, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 3, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 5, 2)) ?>;
+            --bs-link-color: var(--primary);
+            --bs-link-color-rgb: <?= hexdec(substr($themeColors['primary'], 1, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 3, 2)) ?>, <?= hexdec(substr($themeColors['primary'], 5, 2)) ?>;
+            --bs-link-hover-color: var(--primary-dark);
+            --bs-link-hover-color-rgb: <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 1, 2)) ?>, <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 3, 2)) ?>, <?= hexdec(substr($darkenThemeColor($themeColors['primary'], 20), 5, 2)) ?>;
+            --bs-body-color: var(--text);
+            --bs-body-bg: var(--bg);
+            --bs-border-color: var(--border);
         }
 
         * {
@@ -184,11 +263,55 @@ try {
         }
 
         body {
-            background: linear-gradient(180deg, #edf5fa 0%, #f7f9fc 100%);
+            background: var(--bg);
             font-family: Tahoma, Arial, sans-serif;
             color: var(--text);
             margin: 0;
             min-height: 100vh;
+        }
+
+        .btn-primary {
+            --bs-btn-bg: var(--primary);
+            --bs-btn-border-color: var(--primary);
+            --bs-btn-hover-bg: var(--primary-dark);
+            --bs-btn-hover-border-color: var(--primary-dark);
+            --bs-btn-active-bg: var(--primary-dark);
+            --bs-btn-active-border-color: var(--primary-dark);
+            --bs-btn-disabled-bg: var(--primary);
+            --bs-btn-disabled-border-color: var(--primary);
+        }
+
+        .btn-outline-primary {
+            --bs-btn-color: var(--primary);
+            --bs-btn-border-color: var(--primary);
+            --bs-btn-hover-bg: var(--primary);
+            --bs-btn-hover-border-color: var(--primary);
+            --bs-btn-active-bg: var(--primary-dark);
+            --bs-btn-active-border-color: var(--primary-dark);
+        }
+
+        .text-primary {
+            color: var(--primary) !important;
+        }
+
+        .bg-primary {
+            background-color: var(--primary) !important;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), 0.16);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .table {
+            --bs-table-color: var(--text);
+            --bs-table-border-color: var(--border);
         }
 
         .topbar {
@@ -198,7 +321,7 @@ try {
             display: flex;
             align-items: center;
             gap: 14px;
-            box-shadow: 0 6px 20px rgba(13, 92, 140, 0.22);
+            box-shadow: 0 6px 20px rgba(var(--primary-dark-rgb), 0.2);
             position: sticky;
             top: 0;
             z-index: 20;
@@ -243,7 +366,7 @@ try {
             display: flex;
             align-items: center;
             gap: 10px;
-            color: #334155;
+            color: #34464e;
             text-decoration: none;
             padding: 12px 14px;
             border-radius: 12px;
@@ -261,10 +384,10 @@ try {
         }
 
         .sidebar a.active {
-            background: linear-gradient(135deg, var(--primary-soft) 0%, #dfefff 100%);
+            background: linear-gradient(135deg, var(--primary-soft) 0%, #dcebed 100%);
             color: var(--primary);
             font-weight: 700;
-            box-shadow: inset 0 0 0 1px rgba(13, 92, 140, 0.07);
+            box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), 0.08);
         }
 
         .sidebar .logout-link {
@@ -291,6 +414,7 @@ try {
             list-style: none;
             padding: 12px 14px;
             margin: 8px 0;
+            border-right: 3px solid var(--accent);
             cursor: pointer;
             border-radius: 12px;
             transition: background 0.2s ease, color 0.2s ease;
@@ -339,7 +463,7 @@ try {
             min-width: 0;
         }
 
-        main.content > * {
+        main.content > :not(.alert) {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 18px;
@@ -408,6 +532,7 @@ try {
 <div class="container-fluid">
     <div class="row">
 
+        <?php if (!$hideSidebar): ?>
         <aside class="col-md-3 col-lg-2 sidebar">
 
             <?php if (showMenuLink('index.php')): ?>
@@ -542,7 +667,8 @@ try {
                 showMenuLink('notifications.php') ||
                 showMenuLink('messages.php') ||
                 showMenuLink('audit_logs.php') ||
-                showMenuLink('settings.php')
+                showMenuLink('settings.php') ||
+                showMenuLink('theme_settings.php')
             ): ?>
                 <details class="sidebar-group">
                     <summary class="sidebar-section">الإدارة والتواصل</summary>
@@ -570,6 +696,10 @@ try {
                         <?php if (showMenuLink('settings.php')): ?>
                             <a href="settings.php">⚙️ إعدادات المدرسة</a>
                         <?php endif; ?>
+
+                        <?php if (showMenuLink('theme_settings.php')): ?>
+                            <a href="theme_settings.php">🎨 ألوان التطبيق</a>
+                        <?php endif; ?>
                     </div>
                 </details>
             <?php endif; ?>
@@ -586,7 +716,8 @@ try {
             <a href="logout.php" class="logout-link">🚪 تسجيل الخروج</a>
 
         </aside>
+        <?php endif; ?>
 
-        <main class="col-md-9 col-lg-10 content">
+        <main class="<?= $hideSidebar ? 'col-12' : 'col-md-9 col-lg-10' ?> content">
 
           

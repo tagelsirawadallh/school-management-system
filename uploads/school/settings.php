@@ -266,19 +266,19 @@ function settingEscape($value): string
     margin-bottom: 24px;
 }
 .settings-heading h2 {
-    color: #08405F;
+    color: var(--primary-dark);
     font-weight: 700;
 }
 .settings-card {
-    background: #fff;
-    border: 1px solid #e1e8ef;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 14px;
     padding: 24px;
     margin-bottom: 22px;
-    box-shadow: 0 4px 16px rgba(20, 50, 70, .04);
+    box-shadow: var(--shadow);
 }
 .settings-card h5 {
-    color: #0D5C8C;
+    color: var(--primary);
     font-weight: 700;
     margin-bottom: 22px;
 }
@@ -293,20 +293,20 @@ function settingEscape($value): string
 }
 .settings-page .form-control:focus,
 .settings-page .form-select:focus {
-    border-color: #0D5C8C;
-    box-shadow: 0 0 0 .2rem rgba(13, 92, 140, .12);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 .2rem rgba(21, 94, 107, .14);
 }
 .logo-preview {
     width: 105px;
     height: 105px;
     object-fit: contain;
-    border: 1px solid #e1e8ef;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px;
-    background: #f8fafc;
+    background: var(--panel-2);
 }
 .settings-save {
-    background: #0D5C8C;
+    background: var(--primary);
     border: none;
     border-radius: 8px;
     padding: 12px 28px;
@@ -314,7 +314,7 @@ function settingEscape($value): string
     font-weight: 600;
 }
 .settings-save:hover {
-    background: #08405F;
+    background: var(--primary-dark);
     color: white;
 }
 </style>

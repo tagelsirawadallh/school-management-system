@@ -230,16 +230,16 @@ require_once __DIR__ . '/includes/header.php';
     padding: 20px 0 40px;
 }
 .academic-card {
-    background: #fff;
-    border: 1px solid #e1e8ef;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 14px;
     padding: 22px;
     margin-bottom: 22px;
-    box-shadow: 0 4px 16px rgba(20, 50, 70, .04);
+    box-shadow: var(--shadow);
 }
 .academic-page h2,
 .academic-page h5 {
-    color: #0D5C8C;
+    color: var(--primary-dark);
     font-weight: 700;
 }
 .academic-page .form-control,
@@ -251,16 +251,16 @@ require_once __DIR__ . '/includes/header.php';
     font-weight: 600;
 }
 .academic-page .table th {
-    background: #E8F1F8;
-    color: #08405F;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
     white-space: nowrap;
 }
 .academic-page .table td {
     vertical-align: middle;
 }
 .current-year {
-    background: #e6f5ec;
-    color: #17663a;
+    background: #e8f4ed;
+    color: #17633a;
 }
 .status-form {
     min-width: 145px;

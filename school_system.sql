@@ -418,6 +418,27 @@ INSERT INTO `school_settings` (`id`, `school_name`, `school_name_en`, `logo_path
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `app_theme_settings`
+--
+
+CREATE TABLE `app_theme_settings` (
+  `id` tinyint(3) UNSIGNED NOT NULL,
+  `color_primary` char(7) NOT NULL DEFAULT '#155e6b',
+  `color_accent` char(7) NOT NULL DEFAULT '#c49a5a',
+  `color_background` char(7) NOT NULL DEFAULT '#f3f6f8',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `app_theme_settings`
+--
+
+INSERT INTO `app_theme_settings` (`id`, `color_primary`, `color_accent`, `color_background`) VALUES
+(1, '#155e6b', '#c49a5a', '#f3f6f8');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `students`
 --
 

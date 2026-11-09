@@ -36,6 +36,7 @@ $permissions = [
         'messages.php',
         'audit_logs.php',
         'settings.php',
+        'theme_settings.php',
         'change_password.php',
     ],
 
